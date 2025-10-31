@@ -13,8 +13,10 @@ The **Linux Maintenance Script (LMS)** is a modular Bash toolkit that scans a De
 ## Repository Layout
 
 ```
+lms.sh                    # Top-level wrapper (./lms.sh)
 lms/
 ├── lms.sh                # Main orchestrator
+├── config.example.sh     # Copy to config.sh for custom settings
 ├── modules/              # Category-specific diagnostics (10–15 checks each)
 │   ├── network.sh        # Connectivity, DNS, routing
 │   ├── disk.sh           # Capacity, SMART, mounts
@@ -39,25 +41,46 @@ lms/
 - Optional tooling for richer checks: `smartctl` (SMART), `flatpak`, `snap`, `coredumpctl`, etc.—missing tools gracefully downgrade checks to warnings.
 - Node.js ≥ 16 **only if** you plan to run via VS Code F5 (for the `run.js` launcher).
 
+## Quick Start
+
+```bash
+git clone https://github.com/<your-org>/maintenance_scripts.git
+cd maintenance_scripts
+./lms.sh
+```
+
+The wrapper ensures the core script runs with the right paths—no extra setup required.
+
 ## Running LMS
 
 ### Direct from the terminal
 
 ```bash
 # Standard read-only scan
-bash lms/lms.sh
+./lms.sh
 
 # Apply auto-remediations where safe
-bash lms/lms.sh --fix
+./lms.sh --fix
 
 # Add verbose explanations with remediation advice
-bash lms/lms.sh --fix --explain
+./lms.sh --fix --explain
 
 # Customise report path
-bash lms/lms.sh --report /tmp/lms_report.txt
+./lms.sh --report /tmp/lms_report.txt
 ```
 
 Every invocation prints a colorised summary and writes a full audit trail to `lms/reports/` (or your chosen `--report` destination).
+
+## Configuration
+
+- Copy the sample config: `cp lms/config.example.sh lms/config.sh`.
+- Edit `lms/config.sh` to:
+  - toggle modules via `LMS_ENABLED_MODULES=(network disk …)`,
+  - set default behaviour (`LMS_DEFAULT_AUTO_FIX`, `LMS_DEFAULT_EXPLAIN`),
+  - point reports to another directory, or
+  - bake in default arguments (`LMS_DEFAULT_ARGS`).
+
+The config is optional—if it’s absent, LMS falls back to the bundled defaults.
 
 ### From Visual Studio Code (F5)
 
@@ -68,7 +91,7 @@ The repo ships with a `.vscode/launch.json` profile bundle. Press **F5** (or ope
 3. **Run LMS (Explain)** – enables `--explain`.
 4. **Run LMS (Fix + Explain)** – combines both flags.
 
-The Node wrapper at `lms/run.js` simply spawns `bash lms/lms.sh …`, so results appear in the integrated terminal exactly as they would from a shell.
+The Node wrapper at `lms/run.js` simply spawns `./lms.sh …`, so results appear in the integrated terminal exactly as they would from a shell.
 
 ## Check Catalogue (Overview)
 

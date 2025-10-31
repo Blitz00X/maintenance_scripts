@@ -6,7 +6,29 @@ set -o pipefail
 BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 UTIL_DIR="${BASE_DIR}/utils"
 MODULE_DIR="${BASE_DIR}/modules"
+CONFIG_FILE="${BASE_DIR}/config.sh"
 REPORT_DIR="${BASE_DIR}/reports"
+
+if [[ -f "${BASE_DIR}/config.example.sh" ]]; then
+  # shellcheck source=./config.example.sh
+  source "${BASE_DIR}/config.example.sh"
+fi
+
+if [[ -f "${CONFIG_FILE}" ]]; then
+  # shellcheck source=./config.sh
+  source "${CONFIG_FILE}"
+fi
+
+DEFAULT_MODULES=(network disk package performance security system log)
+if [[ -z ${LMS_ENABLED_MODULES+x} || ${#LMS_ENABLED_MODULES[@]} -eq 0 ]]; then
+  LMS_ENABLED_MODULES=("${DEFAULT_MODULES[@]}")
+fi
+
+LMS_DEFAULT_AUTO_FIX=${LMS_DEFAULT_AUTO_FIX:-0}
+LMS_DEFAULT_EXPLAIN=${LMS_DEFAULT_EXPLAIN:-0}
+if [[ -z ${LMS_DEFAULT_ARGS+x} ]]; then
+  LMS_DEFAULT_ARGS=()
+fi
 
 # shellcheck source=./utils/logger.sh
 source "${UTIL_DIR}/logger.sh"
@@ -24,8 +46,12 @@ USAGE
 }
 
 REPORT_PATH=""
-LMS_AUTO_FIX_MODE=0
-LMS_EXPLAIN_MODE=${LMS_EXPLAIN_MODE:-0}
+LMS_AUTO_FIX_MODE=${LMS_DEFAULT_AUTO_FIX}
+LMS_EXPLAIN_MODE=${LMS_DEFAULT_EXPLAIN}
+
+if (( ${#LMS_DEFAULT_ARGS[@]} )); then
+  set -- "${LMS_DEFAULT_ARGS[@]}" "$@"
+fi
 
 parse_args() {
   while [[ $# -gt 0 ]]; do
@@ -56,6 +82,9 @@ parse_args() {
 }
 
 prepare_environment() {
+  if [[ -n "${LMS_REPORT_DIR:-}" ]]; then
+    REPORT_DIR="${LMS_REPORT_DIR}"
+  fi
   mkdir -p "$REPORT_DIR"
   if [[ -z "$REPORT_PATH" ]]; then
     local timestamp
@@ -89,19 +118,27 @@ run_checks() {
   print_info "Report path: ${REPORT_PATH}"
   echo
 
-  run_network_checks
-  echo
-  run_disk_checks
-  echo
-  run_package_checks
-  echo
-  run_performance_checks
-  echo
-  run_security_checks
-  echo
-  run_system_checks
-  echo
-  run_log_checks
+  local module
+  for module in "${LMS_ENABLED_MODULES[@]}"; do
+    run_module "${module}"
+    echo
+  done
+}
+
+run_module() {
+  local module_name="$1"
+  case "$module_name" in
+    network) run_network_checks ;;
+    disk) run_disk_checks ;;
+    package) run_package_checks ;;
+    performance) run_performance_checks ;;
+    security) run_security_checks ;;
+    system) run_system_checks ;;
+    log) run_log_checks ;;
+    *)
+      print_warning "Unknown module '${module_name}' skipped."
+      ;;
+  esac
 }
 
 summarize() {

@@ -6,7 +6,7 @@ const { spawn } = require('child_process');
 const path = require('path');
 
 const projectRoot = path.resolve(__dirname, '..');
-const lmsScript = path.join(projectRoot, 'lms', 'lms.sh');
+const lmsScript = path.join(projectRoot, 'lms.sh');
 const args = process.argv.slice(2);
 
 const child = spawn('bash', [lmsScript, ...args], {
