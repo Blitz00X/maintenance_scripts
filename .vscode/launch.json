@@ -1,0 +1,40 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run LMS",
+      "type": "pwa-node",
+      "request": "launch",
+      "program": "${workspaceFolder}/lms/run.js",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Run LMS (Fix)",
+      "type": "pwa-node",
+      "request": "launch",
+      "program": "${workspaceFolder}/lms/run.js",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "args": ["--fix"]
+    },
+    {
+      "name": "Run LMS (Explain)",
+      "type": "pwa-node",
+      "request": "launch",
+      "program": "${workspaceFolder}/lms/run.js",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "args": ["--explain"]
+    },
+    {
+      "name": "Run LMS (Fix + Explain)",
+      "type": "pwa-node",
+      "request": "launch",
+      "program": "${workspaceFolder}/lms/run.js",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "args": ["--fix", "--explain"]
+    }
+  ]
+}
