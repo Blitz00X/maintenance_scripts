@@ -105,3 +105,7 @@ Yes—invoke `bash lms/lms.sh --report /path/to/artifact.txt` inside your pipeli
 ---
 
 Feel free to adapt the module catalogue to match your environment (e.g., RHEL-based using `dnf`, or servers without systemd). Contributions welcome!
+
+## License
+
+This project is released under the [GNU General Public License v3.0](./LICENSE). By using or distributing LMS you agree to the terms of the GPLv3, including the requirement to share source modifications under the same license.
