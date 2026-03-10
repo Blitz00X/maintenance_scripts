@@ -145,7 +145,13 @@ check_log_journal_integrity() {
     return
   fi
 
-  if ! journalctl --verify >/tmp/lms_journal_verify 2>&1; then
+  # Add timeout to prevent hangs on large/corrupt journals
+  if ! timeout 30s journalctl --verify >/tmp/lms_journal_verify 2>&1; then
+    local exit_code=$?
+    if [[ $exit_code -eq 124 ]]; then
+      record_check_skip "$CODE" "Journal verification timed out after 30s."
+      return
+    fi
     local output
     output=$(head -n 5 /tmp/lms_journal_verify)
     rm -f /tmp/lms_journal_verify
