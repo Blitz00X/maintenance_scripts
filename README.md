@@ -4,11 +4,11 @@ The **Linux Maintenance Script (LMS)** is a modular Bash toolkit that scans a De
 
 ## Highlights
 
-- ✅ **170+ production-grade checks** across networking, storage, packages, performance, security, systemd, and log hygiene.
-- 🛠️ **Optional auto-fix mode** (`--fix`) that safely executes curated remediation commands.
-- 🧠 **Explain mode** (`--explain`) that expands each issue into a human-friendly paragraph.
-- 📝 **Structured reports** (Text & JSON) saved under `lms/reports/` for post-run review.
-- 🎯 **VS Code F5 integration**—launch LMS straight from the debugger with or without flags.
+-  **170+ production-grade checks** across networking, storage, packages, performance, security, systemd, and log hygiene.
+-  **Optional auto-fix mode** (`--fix`) that safely executes curated remediation commands.
+-  **Explain mode** (`--explain`) that expands each issue into a human-friendly paragraph.
+-  **Structured reports** (Text & JSON) saved under `lms/reports/` for post-run review.
+-  **VS Code F5 integration**—launch LMS straight from the debugger with or without flags.
 
 ## Repository Layout
 
@@ -109,7 +109,7 @@ The Node wrapper at `lms/run.js` simply spawns `./lms.sh …`, so results appear
 | System        | `SYS001–SYS014`     | systemd health, timers, identity, symlink hygiene |
 | Logs          | `LOG001–LOG014`     | Journal size/integrity, logrotate, auth anomalies |
 
-> 📌 Each check publishes: `CODE`, `MESSAGE`, `REASON`, `FIX`, and a status (`ok`, `pending`, `fixed`, `failed`). Auto-fixes increment the report’s “Auto-fixed” counter, while pending items document the suggested follow-up.
+>  Each check publishes: `CODE`, `MESSAGE`, `REASON`, `FIX`, and a status (`ok`, `pending`, `fixed`, `failed`). Auto-fixes increment the report’s “Auto-fixed” counter, while pending items document the suggested follow-up.
 
 ## Customisation Tips
 
