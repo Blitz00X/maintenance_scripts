@@ -25,6 +25,7 @@ declare -g LMS_AUTO_FIXED_COUNT=0
 declare -g LMS_REPORT_FILE=""
 : "${LMS_EXPLAIN_MODE:=0}"
 : "${LMS_AUTO_FIX_MODE:=0}"
+: "${LMS_JSON_MODE:=0}"
 
 set_report_file() {
   LMS_REPORT_FILE="$1"
@@ -85,6 +86,9 @@ finalize_report() {
   {
     echo "=== Linux Maintenance Script Report ==="
     echo "Date: $(date '+%Y-%m-%d %H:%M')"
+    echo "OS: $(grep PRETTY_NAME /etc/os-release | cut -d'"' -f2 || echo "Unknown")"
+    echo "Kernel: $(uname -r)"
+    echo "Hostname: $(hostname)"
     echo "Total Checks: ${LMS_TOTAL_CHECKS}"
     echo "Detected Issues: ${LMS_DETECTED_COUNT}"
     echo "Auto-fixed: ${LMS_AUTO_FIXED_COUNT}"
@@ -112,4 +116,55 @@ finalize_report() {
       echo
     done
   } >>"$LMS_REPORT_FILE"
+
+  if (( LMS_JSON_MODE )); then
+    finalize_json_report
+  fi
+}
+
+finalize_json_report() {
+  local json_file="${LMS_REPORT_FILE%.txt}.json"
+  {
+    echo "{"
+    echo "  \"metadata\": {"
+    echo "    \"timestamp\": \"$(date --iso-8601=seconds)\","
+    echo "    \"os\": \"$(grep PRETTY_NAME /etc/os-release | cut -d'"' -f2 || echo "Unknown")\","
+    echo "    \"kernel\": \"$(uname -r)\","
+    echo "    \"hostname\": \"$(hostname)\","
+    echo "    \"summary\": {"
+    echo "      \"total_checks\": ${LMS_TOTAL_CHECKS},"
+    echo "      \"detected_issues\": ${LMS_DETECTED_COUNT},"
+    echo "      \"auto_fixed\": ${LMS_AUTO_FIXED_COUNT}"
+    echo "    }"
+    echo "  },"
+    echo "  \"issues\": ["
+    local first=1
+    for code in "${LMS_CODES[@]}"; do
+      if [[ $first -eq 0 ]]; then echo ","; fi
+      first=0
+      local message="${LMS_MESSAGES[$code]}"
+      local reason="${LMS_REASONS[$code]}"
+      local fix="${LMS_FIXES[$code]}"
+      local status="${LMS_RESULTS[$code]}"
+      local note="${LMS_ACTIONS[$code]}"
+      
+      # Escape quotes for JSON
+      message="${message//\"/\\\"}"
+      reason="${reason//\"/\\\"}"
+      fix="${fix//\"/\\\"}"
+      note="${note//\"/\\\"}"
+
+      echo "    {"
+      echo "      \"code\": \"$code\","
+      echo "      \"message\": \"$message\","
+      echo "      \"reason\": \"$reason\","
+      echo "      \"fix\": \"$fix\","
+      echo "      \"status\": \"$status\","
+      echo "      \"action\": \"$note\""
+      echo "    }"
+    done
+    echo "  ]"
+    echo "}"
+  } >"$json_file"
+  print_info "JSON report saved to: ${json_file}"
 }

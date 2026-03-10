@@ -4,10 +4,10 @@ The **Linux Maintenance Script (LMS)** is a modular Bash toolkit that scans a De
 
 ## Highlights
 
-- ✅ **100 production-grade checks** across networking, storage, packages, performance, security, systemd, and log hygiene.
+- ✅ **170+ production-grade checks** across networking, storage, packages, performance, security, systemd, and log hygiene.
 - 🛠️ **Optional auto-fix mode** (`--fix`) that safely executes curated remediation commands.
 - 🧠 **Explain mode** (`--explain`) that expands each issue into a human-friendly paragraph.
-- 📝 **Structured reports** saved under `lms/reports/report_<timestamp>.txt` for post-run review.
+- 📝 **Structured reports** (Text & JSON) saved under `lms/reports/` for post-run review.
 - 🎯 **VS Code F5 integration**—launch LMS straight from the debugger with or without flags.
 
 ## Repository Layout
@@ -27,10 +27,11 @@ lms/
 │   └── log.sh            # Journald, rotation, auth anomalies
 ├── utils/                # Shared helpers
 │   ├── colors.sh         # ANSI palettes
-│   ├── helper.sh         # Printing + run helpers
-│   └── logger.sh         # Issue tracking + reporting
+│   ├── helper.sh         # Printing + dependency helpers
+│   └── logger.sh         # Issue tracking + Text/JSON reporting
 ├── reports/              # Generated audit logs
-└── run.js                # VS Code debug entrypoint
+├── run.js                # VS Code debug entrypoint
+└── verify_checks.sh      # Utility to count implemented checks
 ```
 
 ## Prerequisites
@@ -65,6 +66,9 @@ The wrapper ensures the core script runs with the right paths—no extra setup r
 # Add verbose explanations with remediation advice
 ./lms.sh --fix --explain
 
+# Generate a machine-readable JSON report
+./lms.sh --json
+
 # Customise report path
 ./lms.sh --report /tmp/lms_report.txt
 ```
@@ -97,8 +101,8 @@ The Node wrapper at `lms/run.js` simply spawns `./lms.sh …`, so results appear
 
 | Category      | Example Check Codes | Focus Areas |
 | ------------- | ------------------- | ----------- |
-| Network       | `NET001–NET015`     | Connectivity, DNS, latency, NTP, SSH exposure |
-| Disk          | `DISK001–DISK015`   | Capacity, inodes, SMART, RAID, swap |
+| Network       | `NET001–NET050`     | Connectivity, DNS, latency, NTP, SSH exposure |
+| Disk          | `DISK001–DISK050`   | Capacity, inodes, SMART, RAID, swap |
 | Package       | `PKG001–PKG014`     | APT health, snaps/flatpaks, unattended updates |
 | Performance   | `PERF001–PERF014`   | Load, RAM/swap, zombies, FD exhaustion |
 | Security      | `SEC001–SEC014`     | SSH hardening, firewall, sysctl lockdown, updates |

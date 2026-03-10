@@ -73,3 +73,13 @@ record_check_skip() {
   local code="$1"; local message="$2"
   print_warning "[${code}] ${message}"
 }
+
+check_dependency() {
+  local tool="$1"
+  local code="$2"
+  if ! command_exists "$tool"; then
+    record_check_skip "$code" "Missing dependency: ${tool}"
+    return 1
+  fi
+  return 0
+}

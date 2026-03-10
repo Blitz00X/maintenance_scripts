@@ -40,6 +40,7 @@ Usage: lms.sh [--fix] [--explain] [--report <path>]
 
   --fix       Apply safe automatic fixes where available
   --explain   Provide verbose explanations for detected issues
+  --json      Generate a structured JSON report
   --report    Custom report output path
   --help      Show this help message
 USAGE
@@ -62,6 +63,10 @@ parse_args() {
         ;;
       --explain)
         LMS_EXPLAIN_MODE=1
+        shift
+        ;;
+      --json)
+        LMS_JSON_MODE=1
         shift
         ;;
       --report)
@@ -95,20 +100,20 @@ prepare_environment() {
 }
 
 load_modules() {
-  # shellcheck source=./modules/network.sh
-  source "${MODULE_DIR}/network.sh"
-  # shellcheck source=./modules/disk.sh
-  source "${MODULE_DIR}/disk.sh"
-  # shellcheck source=./modules/package.sh
-  source "${MODULE_DIR}/package.sh"
-  # shellcheck source=./modules/performance.sh
-  source "${MODULE_DIR}/performance.sh"
-  # shellcheck source=./modules/security.sh
-  source "${MODULE_DIR}/security.sh"
-  # shellcheck source=./modules/system.sh
-  source "${MODULE_DIR}/system.sh"
-  # shellcheck source=./modules/log.sh
-  source "${MODULE_DIR}/log.sh"
+  local module_file
+  for module_file in "${MODULE_DIR}"/*.sh; do
+    if [[ -f "$module_file" ]]; then
+      # shellcheck disable=SC1090
+      source "$module_file"
+    fi
+  done
+}
+
+check_privileges() {
+  if (( LMS_AUTO_FIX_MODE )) && [[ $EUID -ne 0 ]]; then
+    print_warning "Running with --fix but without root privileges. Some remediations may fail."
+    echo
+  fi
 }
 
 run_checks() {
@@ -127,18 +132,12 @@ run_checks() {
 
 run_module() {
   local module_name="$1"
-  case "$module_name" in
-    network) run_network_checks ;;
-    disk) run_disk_checks ;;
-    package) run_package_checks ;;
-    performance) run_performance_checks ;;
-    security) run_security_checks ;;
-    system) run_system_checks ;;
-    log) run_log_checks ;;
-    *)
-      print_warning "Unknown module '${module_name}' skipped."
-      ;;
-  esac
+  local func="run_${module_name}_checks"
+  if declare -F "$func" >/dev/null; then
+    "$func"
+  else
+    print_warning "Unknown module '${module_name}' or check function '${func}' missing."
+  fi
 }
 
 summarize() {
@@ -158,6 +157,7 @@ summarize() {
 main() {
   parse_args "$@"
   prepare_environment
+  check_privileges
   load_modules
   run_checks
   summarize
