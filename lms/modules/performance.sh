@@ -27,6 +27,8 @@ run_performance_checks() {
   check_perf_high_memory_process
   check_perf_swappiness
   check_perf_cpu_governor
+  check_perf_memory_psi
+  check_perf_systemd_oomd
 }
 
 check_perf_load_average() {
@@ -400,5 +402,65 @@ check_perf_cpu_governor() {
     log_issue "$CODE" "$MESSAGE" "$REASON" "$FIX"
   else
     record_check_ok "$CODE" "CPU governor ${governor}."
+  fi
+}
+
+check_perf_memory_psi() {
+  increment_total_checks
+  local CODE="PERF015"
+  local MESSAGE="Sustained memory pressure (PSI)."
+  local REASON="/proc/pressure/memory reports high some backlog, indicating recurring cgroup allocation stalls."
+  local FIX="Reduce memory usage, tune workloads, or add RAM; inspect high RSS processes"
+
+  local psi_file="/proc/pressure/memory"
+  if [[ ! -r "$psi_file" ]]; then
+    record_check_skip "$CODE" "PSI memory interface not available."
+    return
+  fi
+
+  local threshold="${LMS_PSI_MEM_AVG10_WARN:-15.0}"
+  local avg10
+  avg10=$(awk '/^some / {for (i=1; i<=NF; i++) if ($i ~ /^avg10=/) { sub(/^avg10=/, "", $i); print $i; exit}}' "$psi_file")
+  if [[ -z "$avg10" ]]; then
+    record_check_skip "$CODE" "Unable to parse PSI avg10."
+    return
+  fi
+
+  if awk -v v="$avg10" -v t="$threshold" 'BEGIN { exit !(v+0 > t+0) }'; then
+    local REASON_DETAIL="${REASON} some avg10=${avg10} (threshold ${threshold})."
+    set_fix_status "pending" "Investigate memory pressure"
+    log_issue "$CODE" "$MESSAGE" "$REASON_DETAIL" "$FIX"
+  else
+    record_check_ok "$CODE" "Memory PSI avg10=${avg10} within threshold ${threshold}."
+  fi
+}
+
+check_perf_systemd_oomd() {
+  increment_total_checks
+  local CODE="PERF016"
+  local MESSAGE="systemd-oomd enabled but not running."
+  local REASON="The out-of-memory daemon should be active when enabled to avoid uncontrolled killer behaviour."
+  local FIX="Start oomd: sudo systemctl start systemd-oomd"
+
+  if ! command_exists systemctl; then
+    record_check_skip "$CODE" "systemctl missing."
+    return
+  fi
+
+  if ! systemctl list-unit-files 2>/dev/null | grep -q '^systemd-oomd\.service'; then
+    record_check_skip "$CODE" "systemd-oomd not installed."
+    return
+  fi
+
+  if ! systemctl is-enabled systemd-oomd >/dev/null 2>&1; then
+    record_check_skip "$CODE" "systemd-oomd not enabled."
+    return
+  fi
+
+  if systemctl is-active systemd-oomd >/dev/null 2>&1; then
+    record_check_ok "$CODE" "systemd-oomd active."
+  else
+    attempt_fix_cmd "Started systemd-oomd" "sudo systemctl start systemd-oomd"
+    log_issue "$CODE" "$MESSAGE" "$REASON" "$FIX"
   fi
 }

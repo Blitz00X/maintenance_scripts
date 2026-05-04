@@ -3,8 +3,8 @@
 # Copy this file to config.sh and tweak settings as needed.
 
 # Enable or disable modules by listing their short names. Valid entries:
-#   network, disk, package, performance, security, system, log
-LMS_ENABLED_MODULES=(network disk package performance security system log)
+#   network, disk, package, container, performance, security, system, firmware, boot, log
+LMS_ENABLED_MODULES=(network disk package container performance security system firmware boot log)
 
 # Default behaviour flags (0 = disabled, 1 = enabled).
 LMS_DEFAULT_AUTO_FIX=0

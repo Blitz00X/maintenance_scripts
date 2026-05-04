@@ -1,10 +1,10 @@
 # Linux Maintenance Script (LMS)
 
-The **Linux Maintenance Script (LMS)** is a modular Bash toolkit that scans a Debian/Ubuntu system for 100 of the most common operational issues, explains each finding, and auto-remediates safe fixes on demand. It produces colorised terminal output and persists every run to a timestamped report for auditing.
+The **Linux Maintenance Script (LMS)** is a modular Bash toolkit that scans a Debian/Ubuntu system for the most common operational issues across networking, storage, firmware, containers, and services, explains each finding, and auto-remediates safe fixes on demand. It produces colorised terminal output and persists every run to a timestamped report for auditing.
 
 ## Highlights
 
--  **170+ production-grade checks** across networking, storage, packages, performance, security, systemd, and log hygiene.
+-  **189 production-grade checks** across networking, storage, packages, containers, performance, security, firmware, boot/UEFI, systemd, and log hygiene.
 -  **Optional auto-fix mode** (`--fix`) that safely executes curated remediation commands.
 -  **Explain mode** (`--explain`) that expands each issue into a human-friendly paragraph.
 -  **Structured reports** (Text & JSON) saved under `lms/reports/` for post-run review.
@@ -14,24 +14,27 @@ The **Linux Maintenance Script (LMS)** is a modular Bash toolkit that scans a De
 
 ```
 lms.sh                    # Top-level wrapper (./lms.sh)
+verify_checks.sh          # Lists and counts check_* functions in lms/modules
 lms/
 ├── lms.sh                # Main orchestrator
 ├── config.example.sh     # Copy to config.sh for custom settings
-├── modules/              # Category-specific diagnostics (10–15 checks each)
+├── modules/              # Category-specific diagnostics
 │   ├── network.sh        # Connectivity, DNS, routing
 │   ├── disk.sh           # Capacity, SMART, mounts
-│   ├── package.sh        # APT, dpkg, snaps/flatpaks
-│   ├── performance.sh    # Resources, thermal, process health
-│   ├── security.sh       # SSH hardening, sysctl, updates
+│   ├── package.sh        # APT, dpkg, snaps/flatpaks, needrestart, livepatch
+│   ├── container.sh      # Docker, Podman, containerd
+│   ├── performance.sh    # Resources, thermal, PSI, systemd-oomd
+│   ├── security.sh       # SSH hardening, firewall, sysctl, auditd, SELinux
 │   ├── system.sh         # Core services, timers, identity
+│   ├── firmware.sh       # fwupd, microcode packages, LVFS metadata
+│   ├── boot.sh           # systemd-boot (bootctl), Secure Boot, ESP mount
 │   └── log.sh            # Journald, rotation, auth anomalies
 ├── utils/                # Shared helpers
 │   ├── colors.sh         # ANSI palettes
 │   ├── helper.sh         # Printing + dependency helpers
 │   └── logger.sh         # Issue tracking + Text/JSON reporting
 ├── reports/              # Generated audit logs
-├── run.js                # VS Code debug entrypoint
-└── verify_checks.sh      # Utility to count implemented checks
+└── run.js                # VS Code debug entrypoint
 ```
 
 ## Prerequisites
@@ -39,7 +42,7 @@ lms/
 - Bash 5+
 - Core GNU utilities (`awk`, `sed`, `grep`, `find`, etc.)
 - Systemd-based distribution (tested on Debian/Ubuntu)
-- Optional tooling for richer checks: `smartctl` (SMART), `flatpak`, `snap`, `coredumpctl`, etc.—missing tools gracefully downgrade checks to warnings.
+- Optional tooling for richer checks: `smartctl` (SMART), `flatpak`, `snap`, `coredumpctl`, `fwupdmgr`, `needrestart`, `docker`/`podman`, `bootctl`, `mokutil`, etc.—missing tools gracefully downgrade checks to warnings (`record_check_skip`).
 - Node.js ≥ 16 **only if** you plan to run via VS Code F5 (for the `run.js` launcher).
 
 ## Quick Start
@@ -79,7 +82,7 @@ Every invocation prints a colorised summary and writes a full audit trail to `lm
 
 - Copy the sample config: `cp lms/config.example.sh lms/config.sh`.
 - Edit `lms/config.sh` to:
-  - toggle modules via `LMS_ENABLED_MODULES=(network disk …)`,
+  - toggle modules via `LMS_ENABLED_MODULES=(network disk package container …)`,
   - set default behaviour (`LMS_DEFAULT_AUTO_FIX`, `LMS_DEFAULT_EXPLAIN`),
   - point reports to another directory, or
   - bake in default arguments (`LMS_DEFAULT_ARGS`).
@@ -103,10 +106,13 @@ The Node wrapper at `lms/run.js` simply spawns `./lms.sh …`, so results appear
 | ------------- | ------------------- | ----------- |
 | Network       | `NET001–NET050`     | Connectivity, DNS, latency, NTP, SSH exposure |
 | Disk          | `DISK001–DISK050`   | Capacity, inodes, SMART, RAID, swap |
-| Package       | `PKG001–PKG014`     | APT health, snaps/flatpaks, unattended updates |
-| Performance   | `PERF001–PERF014`   | Load, RAM/swap, zombies, FD exhaustion |
-| Security      | `SEC001–SEC014`     | SSH hardening, firewall, sysctl lockdown, updates |
+| Package       | `PKG001–PKG016`     | APT health, snaps/flatpaks, unattended updates, needrestart, Livepatch |
+| Container     | `CTR001–CTR005`     | Docker daemon, disk, Podman, containerd, rootless |
+| Performance   | `PERF001–PERF016`   | Load, RAM/swap, zombies, FD exhaustion, PSI, systemd-oomd |
+| Security      | `SEC001–SEC016`     | SSH hardening, firewall, sysctl, auditd, SELinux, updates |
 | System        | `SYS001–SYS014`     | systemd health, timers, identity, symlink hygiene |
+| Firmware      | `FWU001–FWU005`     | fwupd service, upgrades, metadata cache, CPU microcode |
+| Boot          | `BOOT001–BOOT003`   | systemd-boot status, Secure Boot, EFI mount |
 | Logs          | `LOG001–LOG014`     | Journal size/integrity, logrotate, auth anomalies |
 
 >  Each check publishes: `CODE`, `MESSAGE`, `REASON`, `FIX`, and a status (`ok`, `pending`, `fixed`, `failed`). Auto-fixes increment the report’s “Auto-fixed” counter, while pending items document the suggested follow-up.
@@ -116,6 +122,7 @@ The Node wrapper at `lms/run.js` simply spawns `./lms.sh …`, so results appear
 - Extend modules by adding new `check_*` functions following the existing pattern (`CODE`, `MESSAGE`, `REASON`, `FIX`, and a call to `log_issue`).
 - To add new auto-remediations, wrap commands with `attempt_fix_cmd "Description" "sudo ..."` so they only execute when `--fix` is supplied.
 - Colour palette tweaks live in `utils/colors.sh`; printing utilities are concentrated in `utils/helper.sh`.
+- Optional tuning: `LMS_FWU_METADATA_STALE_DAYS` (firmware metadata freshness), `LMS_DOCKER_ROOT_PCT_WARN` (Docker root filesystem usage), `LMS_PSI_MEM_AVG10_WARN` (memory PSI threshold)—export before running or set in `config.sh`.
 - Reports default to `reports/report_<timestamp>.txt`. Update `prepare_environment` in `lms.sh` if you need alternate retention rules.
 
 ## FAQ

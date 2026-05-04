@@ -27,6 +27,8 @@ run_security_checks() {
   check_sec_reboot_required
   check_sec_passwordless_sudo
   check_sec_pending_security_updates
+  check_sec_auditd_service
+  check_sec_selinux_mode
 }
 
 check_sec_ssh_root_login() {
@@ -347,5 +349,63 @@ check_sec_pending_security_updates() {
     log_issue "$CODE" "$MESSAGE" "$REASON" "$FIX"
   else
     record_check_ok "$CODE" "No pending security updates."
+  fi
+}
+
+check_sec_auditd_service() {
+  increment_total_checks
+  local CODE="SEC015"
+  local MESSAGE="Audit daemon (auditd) inactive."
+  local REASON="Linux auditd collects security-relevant syscalls; when stopped, audits may be incomplete."
+  local FIX="Restart auditd: sudo systemctl restart auditd"
+
+  if ! command_exists systemctl; then
+    record_check_skip "$CODE" "systemctl missing."
+    return
+  fi
+
+  if ! systemctl list-unit-files 2>/dev/null | grep -qE '^auditd\.service'; then
+    record_check_skip "$CODE" "auditd not installed."
+    return
+  fi
+
+  if systemctl is-active auditd >/dev/null 2>&1; then
+    record_check_ok "$CODE" "auditd service active."
+  else
+    attempt_fix_cmd "Restarted auditd" "sudo systemctl restart auditd"
+    log_issue "$CODE" "$MESSAGE" "$REASON" "$FIX"
+  fi
+}
+
+check_sec_selinux_mode() {
+  increment_total_checks
+  local CODE="SEC016"
+  local MESSAGE="SELinux not in enforcing mode."
+  local REASON="Distribution ships SELinux policy but mode is permissive or disabled, reducing mandatory access control coverage."
+  local FIX="Enable enforcing: sudo setenforce 1 (and configure /etc/selinux/config)"
+
+  if ! command_exists getenforce; then
+    record_check_skip "$CODE" "getenforce missing."
+    return
+  fi
+
+  if [[ ! -d /etc/selinux ]]; then
+    record_check_skip "$CODE" "SELinux policy directory absent."
+    return
+  fi
+
+  local mode
+  mode=$(getenforce 2>/dev/null)
+  if [[ -z "$mode" ]]; then
+    record_check_skip "$CODE" "Unable to read SELinux mode."
+    return
+  fi
+
+  if [[ "$mode" == "Enforcing" ]]; then
+    record_check_ok "$CODE" "SELinux enforcing."
+  else
+    local REASON_DETAIL="${REASON} Current mode: ${mode}."
+    set_fix_status "pending" "Review SELinux policy requirements"
+    log_issue "$CODE" "$MESSAGE" "$REASON_DETAIL" "$FIX"
   fi
 }

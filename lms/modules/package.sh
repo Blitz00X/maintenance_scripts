@@ -27,6 +27,8 @@ run_package_checks() {
   check_pkg_unattended_upgrades
   check_pkg_sources_protocol
   check_pkg_partial_packages
+  check_pkg_needrestart
+  check_pkg_livepatch
 }
 
 check_pkg_apt_cache() {
@@ -61,6 +63,10 @@ check_pkg_dpkg_lock() {
   for lock in "${locks[@]}"; do
     if [[ -f "$lock" ]]; then
       if lsof "$lock" >/dev/null 2>&1; then
+        continue
+      fi
+      # Zero-byte lock with no holder is normal when apt is idle
+      if [[ ! -s "$lock" ]]; then
         continue
       fi
       found+=("$lock")
@@ -344,4 +350,71 @@ check_pkg_partial_packages() {
   else
     record_check_ok "$CODE" "No partial package downloads."
   fi
+}
+
+check_pkg_needrestart() {
+  increment_total_checks
+  local CODE="PKG015"
+  local MESSAGE="Processes still using replaced libraries (needrestart)."
+  local REASON="needrestart reports running services or interpreters linked against upgraded libraries."
+  local FIX="Review and reboot or restart services: sudo needrestart"
+
+  if ! command_exists needrestart; then
+    record_check_skip "$CODE" "needrestart not installed."
+    return
+  fi
+
+  local batch
+  batch=$(needrestart -b 2>/dev/null || true)
+  if [[ -z "${batch//[$'\t\r\n ']}" ]]; then
+    record_check_ok "$CODE" "needrestart reports no pending restarts."
+    return
+  fi
+
+  local REASON_DETAIL="${REASON} Batch: ${batch//$'\n'/; }"
+  set_fix_status "pending" "Run sudo needrestart -b or schedule a reboot"
+  log_issue "$CODE" "$MESSAGE" "$REASON_DETAIL" "$FIX"
+}
+
+check_pkg_livepatch() {
+  increment_total_checks
+  local CODE="PKG016"
+  local MESSAGE="Canonical Livepatch is not protecting this kernel."
+  local REASON="canonical-livepatch is installed but the active kernel does not appear livepatched."
+  local FIX="Check support: canonical-livepatch status; enable with canonical-livepatch enable <token>"
+
+  if ! command_exists canonical-livepatch; then
+    record_check_skip "$CODE" "canonical-livepatch not installed."
+    return
+  fi
+
+  local st
+  st=$(canonical-livepatch status 2>/dev/null)
+  if [[ -z "$st" ]]; then
+    record_check_skip "$CODE" "canonical-livepatch status empty."
+    return
+  fi
+
+  if echo "$st" | grep -qiE 'machine token is empty|not enrolled|Unknown command'; then
+    record_check_skip "$CODE" "Livepatch not enrolled (optional service)."
+    return
+  fi
+
+  if echo "$st" | grep -qiE 'Machine is not supported|Unsupported kernel|unsupported architecture|This machine is now running a kernel'; then
+    record_check_skip "$CODE" "Livepatch not applicable to this kernel/machine."
+    return
+  fi
+
+  if echo "$st" | grep -qiE 'Fully patched|fully patched|Patch state: complete|All available patches applied'; then
+    record_check_ok "$CODE" "Canonical Livepatch reports fully patched."
+    return
+  fi
+
+  if echo "$st" | grep -qiE 'livepatch kernel module is loaded|Livepatch is turned on'; then
+    record_check_ok "$CODE" "Canonical Livepatch active."
+    return
+  fi
+
+  set_fix_status "pending" "Run canonical-livepatch status"
+  log_issue "$CODE" "$MESSAGE" "$REASON" "$FIX"
 }

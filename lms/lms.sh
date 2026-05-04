@@ -19,7 +19,7 @@ if [[ -f "${CONFIG_FILE}" ]]; then
   source "${CONFIG_FILE}"
 fi
 
-DEFAULT_MODULES=(network disk package performance security system log)
+DEFAULT_MODULES=(network disk package container performance security system firmware boot log)
 if [[ -z ${LMS_ENABLED_MODULES+x} || ${#LMS_ENABLED_MODULES[@]} -eq 0 ]]; then
   LMS_ENABLED_MODULES=("${DEFAULT_MODULES[@]}")
 fi
